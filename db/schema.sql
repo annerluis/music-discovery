@@ -52,3 +52,41 @@ CREATE TABLE track_similarities (
 CREATE INDEX ON track_embeddings
 USING ivfflat (lyric_vec vector_l2_ops)
 WITH (lists = 100);
+
+-- changing some stuff so less is stored, more is fetched
+ALTER TABLE tracks
+  ADD COLUMN IF NOT EXISTS provider TEXT DEFAULT 'musicbrainz',
+  ADD COLUMN IF NOT EXISTS provider_id TEXT,
+  ADD COLUMN IF NOT EXISTS artist_mbid TEXT,
+  ADD COLUMN IF NOT EXISTS recording_mbid TEXT,
+  ADD COLUMN IF NOT EXISTS release_group_mbid TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_tracks_provider_id
+  ON tracks(provider, provider_id);
+
+
+-- replace/augment track_embeddings
+DROP INDEX IF EXISTS track_embeddings_lyric_vec_idx;
+
+ALTER TABLE track_embeddings
+  ADD COLUMN IF NOT EXISTS kind TEXT DEFAULT 'lyrics',
+  ADD COLUMN IF NOT EXISTS dim INT DEFAULT 384,
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+
+-- if you want multiple vectors per track, change the PK:
+-- ALTER TABLE track_embeddings DROP CONSTRAINT track_embeddings_pkey;
+-- ALTER TABLE track_embeddings ADD PRIMARY KEY (track_id, kind);
+
+-- ensure cosine ops (better for sentence-transformers)
+CREATE INDEX IF NOT EXISTS idx_track_embeddings_cosine
+ON track_embeddings
+USING ivfflat (lyric_vec vector_cosine_ops)
+WITH (lists = 100);
+
+CREATE TABLE IF NOT EXISTS lyrics_cache (
+  track_id INT PRIMARY KEY REFERENCES tracks(id) ON DELETE CASCADE,
+  text_hash TEXT,               -- hash of the lyrics content you processed
+  provider TEXT,                -- where you sourced lyrics (if any)
+  last_checked TIMESTAMPTZ,
+  ttl_minutes INT DEFAULT 10080 -- 7 days
+);

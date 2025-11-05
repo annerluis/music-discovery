@@ -1,15 +1,15 @@
-import Dotenv from 'dotenv';
 import { Pool } from 'pg';
-import path from 'path';
 
-Dotenv.config({ path: path.join(import.meta.dirname,'../.env')});
+const { SUPABASE_DB_URL } = process.env;
+if (!SUPABASE_DB_URL) {
+  throw new Error('SUPABASE_DB_URL is not set');
+}
 
 const pool = new Pool({
-  connectionString: process.env.DB_URL,           
-  ssl: process.env.PGSSL === 'true' ? { rejectUnauthorized: false } : undefined,
-  max: Number(process.env.PG_POOL_MAX || 10),
-  idleTimeoutMillis: Number(process.env.PG_IDLE_MS || 30000),
-  connectionTimeoutMillis: Number(process.env.PG_CONN_MS || 10000),
+  connectionString: SUPABASE_DB_URL,
+  ssl: { rejectUnauthorized: false },
+  max: 10,                // sensible defaults for small plans
+  idleTimeoutMillis: 30000
 });
 
 export async function query(text, params) {
@@ -42,3 +42,5 @@ process.on('SIGINT', async () => {
   await pool.end();
   process.exit(0);
 });
+
+export default pool;
