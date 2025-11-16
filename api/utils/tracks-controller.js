@@ -1,5 +1,6 @@
 import pool from '../db.js';
 import { fetchTrackByMBID } from './musicBrainz.js';
+import { spawn } from 'child_process';
 
 export const importTrack = async (req, res) => {
     const mbid = req.query.mbid;
@@ -29,7 +30,7 @@ export const importTrack = async (req, res) => {
         ]);
         const trackId = result.rows[0].id;
 
-        // TODO: trigger embedding job
+        runEmbeddingJob(trackId);
 
         res.status(201).json({ trackId, ...trackData });
 
@@ -38,3 +39,23 @@ export const importTrack = async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 };
+
+function runEmbeddingJob(trackId) {
+    const proc = spawn('python3', 
+        ["pipeline/embeddings/embed_track.py",
+            String(trackId)
+        ], {
+            cwd: process.cwd(),
+        });
+        proc.stdout.on("data", (data) => {
+            console.log(`[embed ${trackId}]`, data.toString());
+        });
+
+        proc.stderr.on("data", (data) => {
+            console.error(`[embed ${trackId} ERROR]`, data.toString());
+        });
+
+        proc.on("close", (code) => {
+            console.log(`[embed ${trackId}] process exited with code ${code}`);
+        });
+}
