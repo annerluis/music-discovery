@@ -58,4 +58,4 @@ function runEmbeddingJob(trackId) {
         proc.on("close", (code) => {
             console.log(`[embed ${trackId}] process exited with code ${code}`);
         });
-}
+};
